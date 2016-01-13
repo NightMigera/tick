@@ -7,7 +7,13 @@
  */
 
 (function() {
-  var chrome, mode, nextTickMO, nextTickPM, nextTickPR, nextTickTO, opera, ref, ref1, ref2, ref3, secure, tick;
+  var MutationObserver, RangeError, TypeError, chrome, mode, nextTickMO, nextTickPM, nextTickPR, nextTickTO, opera, ref, ref1, ref2, ref3, safeTick, secure, secureTick, tick;
+
+  MutationObserver = window.MutationObserver;
+
+  TypeError = window.TypeError || window.Error || Object;
+
+  RangeError = window.RangeError || window.Error || Object;
 
   nextTickPM = function() {
     var fire, i, nextTick, queue, secureTick;
@@ -36,9 +42,10 @@
         fire = true;
         postMessage('a', '*');
       }
+      return i <= 16;
     };
     secureTick = function(fn) {
-      nextTick(function() {
+      return nextTick(function() {
         try {
           fn();
         } catch (_error) {}
@@ -76,9 +83,10 @@
         fire = true;
         a.setAttribute('lang', (r++).toString());
       }
+      return i <= 16;
     };
     secureTick = function(fn) {
-      nextTick(function() {
+      return nextTick(function() {
         try {
           fn();
         } catch (_error) {}
@@ -111,9 +119,10 @@
         fire = true;
         p = p.then(call);
       }
+      return i <= 16;
     };
     secureTick = function(fn) {
-      nextTick(function() {
+      return nextTick(function() {
         try {
           fn();
         } catch (_error) {}
@@ -145,9 +154,10 @@
         fire = true;
         setTimeout(call, 0);
       }
+      return i <= 16;
     };
     secureTick = function(fn) {
-      nextTick(function() {
+      return nextTick(function() {
         try {
           fn();
         } catch (_error) {}
@@ -175,6 +185,9 @@
   if (mode === 'T') {
     if (window.MutationObserver != null) {
       mode = 'M';
+    } else if (window.WebkitMutationObserver) {
+      MutationObserver = window.WebkitMutationObserver;
+      mode = 'M';
     } else if (typeof window.postMessage === 'function') {
       mode = 'S';
     }
@@ -196,6 +209,46 @@
     default:
       throw new Error('Impossible state');
   }
+
+  safeTick = null;
+
+  tick.getSafe = function() {
+    if (safeTick !== null) {
+      return safeTick;
+    }
+    return safeTick = function(fn) {
+      var err;
+      err = null;
+      if (typeof fn !== 'function') {
+        return new TypeError('fn is not a function');
+      }
+      if (!tick(fn)) {
+        err = new RangeError('more than 16 task wait end of queue, not critical');
+      }
+      return err;
+    };
+  };
+
+  secureTick = null;
+
+  tick.getSecure = function() {
+    if (secureTick !== null) {
+      return secureTick;
+    }
+    return secureTick = function(fn) {
+      var err;
+      err = null;
+      if (typeof fn !== 'function') {
+        throw new TypeError('fn is not a function');
+      }
+      if (!secure(fn)) {
+        err = new RangeError('more than 16 task wait end of queue, not critical');
+      }
+      return err;
+    };
+  };
+
+  tick.mode = mode;
 
   if ((typeof module !== "undefined" && module !== null) && 'exports' in module) {
     module.exports = tick;
